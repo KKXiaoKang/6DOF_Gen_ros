@@ -1,0 +1,14 @@
+# pytorch>=1.7.1
+# torchvision
+# opencv-python
+# pytorch3d
+# cudatoolkit
+transforms3d
+numpy
+plyfile
+scikit-image
+matplotlib
+open3d
+pyyaml
+tensorboardX
+tqdm
