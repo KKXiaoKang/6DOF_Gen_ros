@@ -167,5 +167,8 @@ devel/
 .catkin_tools/
 logs/
 
-# 屏蔽
+# 屏蔽data文件
 data/
+
+# 屏蔽colmap源文件
+colmap/
