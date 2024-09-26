@@ -19,6 +19,7 @@ from cv_bridge import CvBridge
 
 import time
 import cv2 
+from scipy.spatial.transform import Rotation as R # 提取旋转矩阵
 
 USE_VIRTUAL_K = True  # 是否使用伪K进行姿态估计
 
@@ -86,7 +87,7 @@ class PoseEstimatorNode:
                 # rospy.loginfo("初始化已存在，执行精细化...")
                 self.estimator.cfg['refine_iter'] = 1  # 仅在初始化后进行一次精细化
             else:
-                rospy.loginfo("执行初步姿态估计...")
+                # rospy.loginfo("执行初步姿态估计...")
                 pass
             pose_pr, inter_results = self.estimator.predict(img, K, pose_init=self.pose_init)
             # 计算结束时间
@@ -106,10 +107,29 @@ class PoseEstimatorNode:
             pts__, _ = project_points(self.object_bbox_3d, pose_, K)
             bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))
 
+            """
+                提取旋转矩阵 | 计算欧拉角
+            """
+            # 输出姿态
+            #rospy.loginfo(f"估计的姿态: \n{pose_pr}")
+            # 提取旋转矩阵
+            rotation_matrix = pose_pr[:, :3]  # 取前3列
+            rospy.loginfo(f"提取的旋转矩阵: \n{rotation_matrix}")
+            # 将旋转矩阵转换为欧拉角
+            rotation = R.from_matrix(rotation_matrix)
+            euler_angles = rotation.as_euler('xyz', degrees=True)  # 使用XYZ顺序并转换为度数
+            rospy.loginfo(f"物体的欧拉角 (XYZ顺序): \n{euler_angles}")
+
+            """
+                绘制 fps | 绘制欧拉角信息
+            """
             # 在图像上绘制fps
             cv2.putText(bbox_img_, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            rospy.loginfo("绘制并发布包围框图像...")
+            # 添加欧拉角信息到图像
+            euler_text = f"Pitch:{euler_angles[0]:.2f}, Yaw:{euler_angles[1]:.2f}, Roll:{euler_angles[2]:.2f}"
+            cv2.putText(bbox_img_, euler_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
+
+            # rospy.loginfo("绘制并发布包围框图像...")
             # 将 bbox_img 转换为 ROS 图像消息并发布
             bbox_img_msg = self.bridge.cv2_to_imgmsg(bbox_img_, encoding='bgr8')
             self.bbox_pub.publish(bbox_img_msg)
@@ -118,7 +138,8 @@ class PoseEstimatorNode:
             if self.pose_init is not None:
                 self.estimator.cfg['refine_iter'] = 1  # 仅在初始化后进行一次精细化
             else:
-                rospy.loginfo("执行初步姿态估计...")
+                # rospy.loginfo("执行初步姿态估计...")
+                pass
 
             # 使用相机的实际K进行姿态估计
             pose_pr, inter_results = self.estimator.predict(img, self.K, pose_init=self.pose_init)
@@ -134,14 +155,14 @@ class PoseEstimatorNode:
             pts__, _ = project_points(self.object_bbox_3d, pose_, self.K)
             bbox_img_ = draw_bbox_3d(img, pts__, (0, 0, 255))
 
-            rospy.loginfo("绘制并发布包围框图像...")
+            # rospy.loginfo("绘制并发布包围框图像...")
             # 将 bbox_img 转换为 ROS 图像消息并发布
             bbox_img_msg = self.bridge.cv2_to_imgmsg(bbox_img_, encoding='bgr8')
-            self.bbox_pub.publish(bbox_img_msg)
+            self.bbox_pub.publish(bbox_img_msg)            
 
 
 def weighted_pts(pts_list, weight_num=10, std_inv=10):
-    rospy.loginfo(f"计算加权历史点，权重数量: {weight_num}, 标准差倒数: {std_inv}")
+    # rospy.loginfo(f"计算加权历史点，权重数量: {weight_num}, 标准差倒数: {std_inv}")
     weights = np.exp(-(np.arange(weight_num) / std_inv) ** 2)[::-1]
     pose_num = len(pts_list)
     if pose_num < weight_num:
